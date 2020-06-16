@@ -2,6 +2,7 @@ AUTHORS
 LICENSE
 MANIFEST.in
 README
+setup.py
 django_notification.egg-info/PKG-INFO
 django_notification.egg-info/SOURCES.txt
 django_notification.egg-info/dependency_links.txt

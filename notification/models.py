@@ -5,6 +5,7 @@ try:
 except ImportError:
     import pickle
 
+from base64 import b64encode, b64decode
 from django.db import models
 from django.db.models.query import QuerySet
 from django.conf import settings
@@ -17,14 +18,14 @@ from django.utils.translation import ugettext_lazy as _
 from django.utils.translation import ugettext, get_language, activate
 from django.apps import apps
 from django.contrib.sites.models import Site
-from django.contrib.auth.models import User
+# from django.contrib.auth.models import User
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes import fields
 
 QUEUE_ALL = getattr(settings, "NOTIFICATION_QUEUE_ALL", False)
 
-
+User = settings.AUTH_USER_MODEL
 class LanguageStoreNotAvailable(Exception):
     pass
 
@@ -44,7 +45,7 @@ class NoticeType(models.Model):
     class Meta:
         verbose_name = _("notice type")
         verbose_name_plural = _("notice types")
-        app_label = _("notification-noticetype")
+        app_label = "notification"
 
 
 # if this gets updated, the create() method below needs to be as well...
@@ -73,7 +74,7 @@ class NoticeSetting(models.Model):
         verbose_name = _("notice setting")
         verbose_name_plural = _("notice settings")
         unique_together = ("user", "notice_type", "medium")
-        app_label = _("notification-noticesetting")
+        app_label = "notification"
 
 
 def get_notification_setting(user, notice_type, medium):
@@ -175,10 +176,10 @@ class Notice(models.Model):
         ordering = ["-added"]
         verbose_name = _("notice")
         verbose_name_plural = _("notices")
-        app_label = _("notification-notice")
+        app_label = "notification"
     
     def get_absolute_url(self):
-        return reverse("notification_notice", args=[str(self.pk)])
+        return reverse("notification_notice", args=[self.pk])
 
 
 class NoticeQueueBatch(models.Model):
@@ -189,7 +190,7 @@ class NoticeQueueBatch(models.Model):
     pickled_data = models.TextField()
 
     class Meta:
-        app_label = _("notification-noticequeuebatch")
+        app_label = "notification"
 
 def create_notice_type(label, display, description, default=2, verbosity=1):
     """
@@ -316,6 +317,7 @@ def send_now(users, label, extra_context=None, on_site=True, sender=None):
             "current_site": current_site,
         })
         context.update(extra_context)
+        print("Extra context: ", extra_context)
         
         # get prerendered format messages
         messages = get_formatted_messages(formats, label, context)
@@ -323,11 +325,11 @@ def send_now(users, label, extra_context=None, on_site=True, sender=None):
         # Strip newlines from subject
         subject = "".join(render_to_string("notification/email_subject.txt", {
             "message": messages["short.txt"],
-        }, context).splitlines())
+        'context': context }).splitlines())
         
         body = render_to_string("notification/email_body.txt", {
-            "message": messages["full.txt"],
-        }, context)
+            "message": messages["full.txt"], 'context': context
+        }, )
         
         notice = Notice.objects.create(recipient=user, message=messages["notice.html"],
             notice_type=notice_type, on_site=on_site, sender=sender)
@@ -346,6 +348,7 @@ def send(*args, **kwargs):
     be queued or not. A per call ``queue`` or ``now`` keyword argument can be
     used to always override the default global behavior.
     """
+
     queue_flag = kwargs.pop("queue", False)
     now_flag = kwargs.pop("now", False)
     assert not (queue_flag and now_flag), "'queue' and 'now' cannot both be True."
@@ -375,7 +378,7 @@ def queue(users, label, extra_context=None, on_site=True, sender=None):
     notices = []
     for user in users:
         notices.append((user, label, extra_context, on_site, sender))
-    NoticeQueueBatch(pickled_data=pickle.dumps(notices).encode("base64")).save()
+    NoticeQueueBatch(pickled_data=b64encode(pickle.dumps(notices))).save()
 
 
 class ObservedItemManager(models.Manager):
@@ -416,7 +419,7 @@ class ObservedItem(models.Model):
         ordering = ["-added"]
         verbose_name = _("observed item")
         verbose_name_plural = _("observed items")
-        app_label = _("notification-observeditem")
+        app_label = "notification"
     
     def send_notice(self, extra_context=None):
         if extra_context is None:

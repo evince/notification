@@ -1,6 +1,6 @@
 from django.urls import reverse
-from django.shortcuts import render_to_response, get_object_or_404
-from django.http import HttpResponseRedirect, Http404
+from django.shortcuts import render, get_object_or_404
+from django.http import HttpResponseRedirect, Http404, HttpResponse
 from django.template import RequestContext
 
 from django.contrib.auth.decorators import login_required
@@ -41,9 +41,9 @@ def notices(request):
     """
     notices = Notice.objects.notices_for(request.user, on_site=True)
     
-    return render_to_response("notification/notices.html", {
+    return render(request, "notification/notices.html", {
         "notices": notices,
-    }, context_instance=RequestContext(request))
+    }, RequestContext(request))
 
 
 @login_required
@@ -93,11 +93,12 @@ def notice_settings(request):
         "column_headers": [medium_display for medium_id, medium_display in NOTICE_MEDIA],
         "rows": settings_table,
     }
-    
-    return render_to_response("notification/notice_settings.html", {
+
+    context_instance=RequestContext(request)
+    return render(request, "notification/notice_settings.html", {
         "notice_types": notice_types,
         "notice_settings": notice_settings,
-    }, context_instance=RequestContext(request))
+    }, context_instance)
 
 
 @login_required
@@ -123,9 +124,10 @@ def single(request, id, mark_seen=True):
         if mark_seen and notice.unseen:
             notice.unseen = False
             notice.save()
-        return render_to_response("notification/single.html", {
+
+        return render(request, "notification/single.html", {
             "notice": notice,
-        }, context_instance=RequestContext(request))
+        }, RequestContext(request))
     raise Http404
 
 
@@ -196,3 +198,8 @@ def mark_all_seen(request):
         notice.unseen = False
         notice.save()
     return HttpResponseRedirect(reverse("notification_notices"))
+
+@login_required
+def unseen_count(reqest):
+    notice = Notice.objects.unseen_count_for(reqest.user)
+    return HttpResponse(notice)
