@@ -18,7 +18,6 @@ from django.utils.translation import ugettext_lazy as _
 from django.utils.translation import ugettext, get_language, activate
 from django.apps import apps
 from django.contrib.sites.models import Site
-# from django.contrib.auth.models import User
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes import fields
@@ -244,16 +243,17 @@ def get_formatted_messages(formats, label, context):
     are fully rendered templates with the given context.
     """
     format_templates = {}
+
     for format in formats:
         # conditionally turn off autoescaping for .txt extensions in format
         if format.endswith(".txt"):
             context.autoescape = False
         else:
             context.autoescape = True
-        format_templates[format] = render_to_string((
+        format_templates[format] = render_to_string([
             "notification/%s/%s" % (label, format),
-            "notification/%s" % format),
-            #context_instance=context
+            "notification/%s" % format],
+            {'context': context}
          )
     return format_templates
 
@@ -303,11 +303,11 @@ def send_now(users, label, extra_context=None, on_site=True, sender=None):
             language = get_notification_language(user)
         except LanguageStoreNotAvailable:
             language = None
-        
+
         if language is not None:
             # activate the user's language
             activate(language)
-        
+
         # update context with user specific translations
         context = Context({
             "recipient": user,
@@ -317,26 +317,25 @@ def send_now(users, label, extra_context=None, on_site=True, sender=None):
             "current_site": current_site,
         })
         context.update(extra_context)
-        print("Extra context: ", extra_context)
-        
+
         # get prerendered format messages
         messages = get_formatted_messages(formats, label, context)
-        
+
         # Strip newlines from subject
         subject = "".join(render_to_string("notification/email_subject.txt", {
             "message": messages["short.txt"],
         'context': context }).splitlines())
-        
+
         body = render_to_string("notification/email_body.txt", {
             "message": messages["full.txt"], 'context': context
         }, )
-        
+
         notice = Notice.objects.create(recipient=user, message=messages["notice.html"],
             notice_type=notice_type, on_site=on_site, sender=sender)
         if should_send(user, notice_type, "1") and user.email and user.is_active: # Email
             recipients.append(user.email)
         send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, recipients)
-    
+
     # reset environment to original language
     activate(current_language)
 
