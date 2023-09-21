@@ -4,7 +4,7 @@ from django.urls import reverse
 from django.conf import settings
 from django.shortcuts import get_object_or_404
 from django.template.defaultfilters import linebreaks, escape, striptags
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 
 from django.contrib.auth.models import User
 from django.contrib.sites.models import Site
